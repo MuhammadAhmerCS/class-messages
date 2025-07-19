@@ -5,20 +5,8 @@ import os
 st.set_page_config(page_title="Secret Class Messages", layout="centered")
 st.title("💌 Secret Class Messages")
 
-# --- List of classmates (example: add all 30) ---
+# --- List of classmates (edit this with your full class list) ---
 students = ["Aarav", "Bela", "Chirag", "Divya", "Eshan", "Farah", "Gautam", "Heena"]
-
-# --- Secret codes for each student (private) ---
-codes = {
-    "Aarav": "1234",
-    "Bela": "5678",
-    "Chirag": "abcd",
-    "Divya": "4444",
-    "Eshan": "5555",
-    "Farah": "6666",
-    "Gautam": "7777",
-    "Heena": "8888"
-}
 
 # --- Message Form ---
 st.header("✍️ Send a Message")
@@ -42,28 +30,46 @@ if st.button("Send Message"):
 # --- Divider ---
 st.markdown("---")
 
-# --- View Messages ---
+# --- View Messages With Self-Set Secret Code ---
 st.header("🔐 View Your Messages")
 
-col1, col2 = st.columns(2)
-with col1:
-    name_input = st.text_input("Your Name", key="name_input")
-with col2:
-    code_input = st.text_input("Your Secret Code", type="password", key="code_input")
+your_name = st.text_input("Your Name", key="view_name")
+code_entered = st.text_input("Enter your secret code (or create one)", type="password", key="view_code")
 
-if st.button("Unlock My Messages"):
-    if codes.get(name_input) == code_input:
-        try:
-            df = pd.read_csv("messages.csv")
-            my_msgs = df[df["To"].str.lower() == name_input.lower()]
-            if not my_msgs.empty:
-                st.success(f"📬 Found {len(my_msgs)} message(s) for {name_input}")
-                for i, row in my_msgs.iterrows():
-                    st.markdown(f"**From:** {row['From'] or 'Anonymous'}")
-                    st.info(row["Message"])
-            else:
-                st.warning("😔 No messages found for you yet.")
-        except FileNotFoundError:
-            st.error("📂 No message file found yet. Be the first to send one!")
+if st.button("Access Messages"):
+    # Load or create code storage file
+    if os.path.exists("user_codes.csv"):
+        codes_df = pd.read_csv("user_codes.csv")
     else:
-        st.error("🚫 Incorrect name or secret code.")
+        codes_df = pd.DataFrame(columns=["Name", "Code"])
+
+    # Check if user already set a code
+    existing = codes_df[codes_df["Name"].str.lower() == your_name.lower()]
+
+    if existing.empty:
+        # First time user — create new code
+        if code_entered:
+            new_code = pd.DataFrame([[your_name, code_entered]], columns=["Name", "Code"])
+            codes_df = pd.concat([codes_df, new_code], ignore_index=True)
+            codes_df.to_csv("user_codes.csv", index=False)
+            st.success("✅ Secret code created! You can now view your messages.")
+        else:
+            st.warning("Please enter a secret code to register.")
+    else:
+        # Returning user — check if code matches
+        real_code = str(existing.iloc[0]["Code"])
+        if code_entered == real_code:
+            try:
+                df = pd.read_csv("messages.csv")
+                personal_msgs = df[df["To"].str.lower() == your_name.lower()]
+                if not personal_msgs.empty:
+                    st.success(f"📬 Found {len(personal_msgs)} message(s) for {your_name}")
+                    for _, row in personal_msgs.iterrows():
+                        st.markdown(f"**From:** {row['From'] or 'Anonymous'}")
+                        st.info(row["Message"])
+                else:
+                    st.warning("😔 No messages found for you yet.")
+            except FileNotFoundError:
+                st.error("No messages have been sent yet.")
+        else:
+            st.error("🚫 Incorrect secret code.")
