@@ -46,3 +46,16 @@ if st.button("Show My Messages"):
             st.warning("😔 No messages found for you yet.")
     except FileNotFoundError:
         st.error("No messages have been sent yet.")
+# Add this near the 'view messages' section
+codes = {"Aarav": "1234", "Bela": "5678", "Chirag": "abcd"}  # Add your class here
+
+name = st.text_input("Your Name")
+code = st.text_input("Your Secret Code", type="password")
+
+if st.button("Unlock My Messages"):
+    if codes.get(name) == code:
+        # Show messages as before
+        ...
+    else:
+        st.error("Incorrect code.")
+
