@@ -27,3 +27,22 @@ if st.button("Send Message"):
             all_msgs = new_msg
         all_msgs.to_csv("messages.csv", index=False)
         st.success("✅ Your message has been sent anonymously!")
+# --- View Messages ---
+st.markdown("---")
+st.subheader("🔐 View Messages Sent to You")
+
+your_name = st.text_input("Enter your name to view your messages")
+
+if st.button("Show My Messages"):
+    try:
+        df = pd.read_csv("messages.csv")
+        my_msgs = df[df["To"].str.lower() == your_name.lower()]
+
+        if not my_msgs.empty:
+            for i, row in my_msgs.iterrows():
+                st.markdown(f"📨 **From:** {row['From'] or 'Anonymous'}")
+                st.info(row["Message"])
+        else:
+            st.warning("😔 No messages found for you yet.")
+    except FileNotFoundError:
+        st.error("No messages have been sent yet.")
