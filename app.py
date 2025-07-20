@@ -2,24 +2,62 @@ import streamlit as st
 import pandas as pd
 import os
 
-# --- Page settings ---
+# --- Config ---
 st.set_page_config(page_title="Secret Class Messages", layout="centered")
 st.title("💌 Secret Class Messages")
-st.markdown("Welcome to your class message wall! Send kind or fun messages to your classmates. Each message is private and anonymous.")
 
-# --- List of classmates (edit for your real list) ---
-students = ["Aarav", "Bela", "Chirag", "Divya", "Eshan", "Farah", "Gautam", "Heena"]
+st.markdown("""
+Welcome to your class's secret message wall!  
+Here, you can:
+- ✨ Send **anonymous messages** to your classmates  
+- 🔐 Create a **private inbox** that only **you** can unlock  
+---
+""")
 
-# --- Message Sending Section ---
-st.header("✍️ Send a Message")
+# --- Classmate List ---
+students = ["Aarav", "Bela", "Chirag", "Divya", "Eshan", "Farah", "Gautam", "Heena"]  # Customize this
 
-sender = st.text_input("Your Name (or leave blank for anonymous)", key="sender")
-receiver = st.selectbox("Choose a classmate to send a message to:", students, key="receiver")
-message = st.text_area("Write your message here", key="message")
+# --- Section: Create Private Inbox ---
+st.header("🔐 Step 1: Set Your Private Inbox Password")
 
-if st.button("Send Message"):
+st.markdown("**Create your own secret password. Only you will know it. No one else — not even the sender — can access your messages.**")
+
+name_for_code = st.text_input("Enter Your Name", key="name_for_code")
+new_password = st.text_input("Set a Secret Password (only once)", type="password", key="new_password")
+
+if st.button("🔒 Lock My Inbox"):
+    if name_for_code and new_password:
+        if os.path.exists("user_codes.csv"):
+            codes_df = pd.read_csv("user_codes.csv")
+        else:
+            codes_df = pd.DataFrame(columns=["Name", "Code"])
+
+        existing_user = codes_df[codes_df["Name"].str.lower() == name_for_code.lower()]
+
+        if not existing_user.empty:
+            st.warning("🔐 You already set a password. Try viewing your messages below.")
+        else:
+            new_code = pd.DataFrame([[name_for_code, new_password]], columns=["Name", "Code"])
+            codes_df = pd.concat([codes_df, new_code], ignore_index=True)
+            codes_df.to_csv("user_codes.csv", index=False)
+            st.success("✅ Your inbox is locked. Only you can open it now.")
+    else:
+        st.warning("Please enter both name and password.")
+
+st.markdown("---")
+
+# --- Section: Send Message ---
+st.header("✍️ Step 2: Send a Secret Message")
+
+st.markdown("You can send a message to anyone in your class. Your name is **optional**. If you leave it blank, it stays anonymous forever.")
+
+sender = st.text_input("Your Name (leave blank to stay anonymous)", key="sender_name")
+receiver = st.selectbox("Choose a classmate to send a message to:", students)
+message = st.text_area("Write your message here")
+
+if st.button("📤 Send Message"):
     if not message.strip():
-        st.warning("⚠️ Please write a message before sending.")
+        st.warning("⚠️ You must write something!")
     else:
         new_msg = pd.DataFrame([[receiver, sender, message]], columns=["To", "From", "Message"])
         if os.path.exists("messages.csv"):
@@ -28,52 +66,42 @@ if st.button("Send Message"):
         else:
             all_msgs = new_msg
         all_msgs.to_csv("messages.csv", index=False)
-        st.success(f"✅ Message sent to {receiver}!")
+        st.success(f"✅ Your anonymous message was sent to {receiver}!")
 
 st.markdown("---")
 
-# --- Message Viewing Section ---
-st.header("🔐 View Your Messages")
+# --- Section: View Messages ---
+st.header("📬 Step 3: View Your Private Inbox")
 
-your_name = st.text_input("Your Name", key="view_name")
-code_entered = st.text_input("Enter your secret code (or create one)", type="password", key="view_code")
+st.markdown("Enter your name and secret password to access messages sent only to you.")
 
-if st.button("Access Messages"):
-    # Load or create code storage
+your_name = st.text_input("Your Name", key="inbox_name")
+code_entered = st.text_input("Enter Your Secret Password", type="password", key="inbox_code")
+
+if st.button("📥 Unlock My Inbox"):
     if os.path.exists("user_codes.csv"):
         codes_df = pd.read_csv("user_codes.csv")
-    else:
-        codes_df = pd.DataFrame(columns=["Name", "Code"])
+        user_row = codes_df[codes_df["Name"].str.lower() == your_name.lower()]
 
-    # Check if user already has a code
-    existing = codes_df[codes_df["Name"].str.lower() == your_name.lower()]
-
-    if existing.empty:
-        # First time user — set a code
-        if code_entered:
-            new_code = pd.DataFrame([[your_name, code_entered]], columns=["Name", "Code"])
-            codes_df = pd.concat([codes_df, new_code], ignore_index=True)
-            codes_df.to_csv("user_codes.csv", index=False)
-            st.success("🔐 Secret code created! This protects your inbox.")
-            st.info("✅ Now you can view your private messages below.")
+        if not user_row.empty:
+            saved_code = str(user_row.iloc[0]["Code"])
+            if code_entered == saved_code:
+                # Show messages
+                try:
+                    df = pd.read_csv("messages.csv")
+                    personal_msgs = df[df["To"].str.lower() == your_name.lower()]
+                    if not personal_msgs.empty:
+                        st.success(f"📫 You have {len(personal_msgs)} message(s):")
+                        for _, row in personal_msgs.iterrows():
+                            st.markdown(f"**From:** {row['From'] or 'Anonymous'}")
+                            st.info(row["Message"])
+                    else:
+                        st.warning("😔 No messages found for you yet.")
+                except FileNotFoundError:
+                    st.warning("No messages have been sent yet.")
+            else:
+                st.error("🚫 Incorrect password. Please try again.")
         else:
-            st.info("🔒 First time here? Set a secret password so only **you** can access your inbox.")
-            st.warning("Please enter a code to register your inbox.")
+            st.error("❌ No inbox found for that name. Please set it up above.")
     else:
-        # Returning user — verify code
-        real_code = str(existing.iloc[0]["Code"])
-        if code_entered == real_code:
-            try:
-                df = pd.read_csv("messages.csv")
-                personal_msgs = df[df["To"].str.lower() == your_name.lower()]
-                if not personal_msgs.empty:
-                    st.success(f"📬 You have {len(personal_msgs)} message(s):")
-                    for _, row in personal_msgs.iterrows():
-                        st.markdown(f"**From:** {row['From'] or 'Anonymous'}")
-                        st.info(row["Message"])
-                else:
-                    st.warning("😔 No messages found for you yet.")
-            except FileNotFoundError:
-                st.error("No messages have been sent yet.")
-        else:
-            st.error("🚫 Incorrect secret code.")
+        st.warning("🔐 No inboxes exist yet. Be the first to create one!")
